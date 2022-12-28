@@ -11,6 +11,14 @@ public enum TickPhase
     Misc
 }
 
+public enum PhaseStage
+{
+    Initializing,
+    Preparing,
+    Executing,
+    Finished
+}
+
 public class TickManager : MonoBehaviour
 {
     public static TickManager instance;
@@ -29,11 +37,14 @@ public class TickManager : MonoBehaviour
 
     public List<Agent> allAgents;
     public List<Agent> allyAgents;
+    public List<Agent> enemyAgents;
+
     public List<AgentAction> actionsThisPhase;
     public List<AgentAction> actionsThisTick;
     public List<AgentAction> actionsAllTicks;
     public Queue<AgentAction> actionsThisPhaseQueue;
     public TickPhase phase;
+    public PhaseStage phaseStage;
     int currentTick = 0;
     int currentActionIndex = 0;
 
@@ -49,14 +60,18 @@ public class TickManager : MonoBehaviour
     // Fourth, enemies who wish to move perform their movements.
     // Finally, miscellaneous events such as picking up an item or displaying the staircase UI happen ?
     // 
-    void Tick()
+
+    // One Tick = four phases
+    // One Phase = four stages
+
+    // Runs once at the start of every phase
+    void PhaseInit()
     {
         switch(phase)
         {
             case TickPhase.Player:
                 {
                     //Wait for a successful player AgentAction event
-                    agentController.awaitingAction = true;
                     agentController.currentAgent.RequestAction();
                     break;
                 }
@@ -81,6 +96,7 @@ public class TickManager : MonoBehaviour
                     break;
                 }
         }
+        phaseStage = PhaseStage.Preparing;
     }
 
     public void NewAction(AgentAction action)
@@ -92,33 +108,38 @@ public class TickManager : MonoBehaviour
         action.Prepare();
     }
 
-    void PlayerHasActed()
-    {
-        NextPhase();
-        //Prepare all teammate actions, then execute in order of movement/attack, and team ID
-        //Temp loop here
-        for(int i = 0; i < actionsThisTick.Count; i++)
-        {
-            actionsThisTick[i].Execute();
-        }
-    }
-
     void NextPhase() //Progresses to the next phase 
     {
         if(phase == TickPhase.Misc)
         {
-            Debug.Log("Waiting for completion");
+            if(CheckForActionCompletion())
+            {
+                NewTick();
+            }
             return;
         }
         else
         {
             phase += 1;
             actionsThisPhase.Clear();
+            phaseStage = PhaseStage.Initializing;
         }
     }
 
     bool ActionsReady()
     {
+        if (phase == TickPhase.Player && actionsThisPhase.Count == 0)
+        {
+            // Wait for at least one action to come through
+            return false;
+        }
+
+        if (actionsThisPhase.Count == 0)
+        {
+            phaseStage = PhaseStage.Finished;
+            return false;
+        }
+
         for (int i = 0; i < actionsThisPhase.Count; i++)
         {
             if (actionsThisPhase[i].state != AgentActionState.Ready)
@@ -126,12 +147,38 @@ public class TickManager : MonoBehaviour
                 return false;
             }
         }
+
+        // Ensure all agents who belong to this phase have returned an action
+        // This might not be necessary
+        phaseStage = PhaseStage.Executing;
         return true;
     }
 
     void ActionLoop()
     {
-        for(int i = 0; i < actionsThisPhase.Count; i++)
+        // Runs Execute if it hasn't been done so already
+        // Execute() sets the state to Loop so it only runs once
+        if (actionsThisPhase[currentActionIndex].state == AgentActionState.Ready)
+            actionsThisPhase[currentActionIndex].Execute();
+        // Exit conditions
+        if (actionsThisPhase[currentActionIndex].state == AgentActionState.Complete)
+        {
+            if(actionsThisPhase.Count > currentActionIndex + 1)
+            {
+                currentActionIndex++;
+                return;
+            }
+            else
+            {
+                phaseStage = PhaseStage.Finished;
+                currentActionIndex = 0;
+                return;
+            }
+        }
+
+        actionsThisPhase[currentActionIndex].ExecuteLoop();
+
+        for (int i = 0; i < actionsThisPhase.Count; i++)
         {
             if (actionsThisPhase[i].state == AgentActionState.Loop)
             {
@@ -146,6 +193,8 @@ public class TickManager : MonoBehaviour
         {
             if (actionsThisTick[i].state != AgentActionState.Complete)
             {
+                Debug.LogWarning("Action from agent " + actionsThisTick[i].owner.name + " of type "
+                    + actionsThisTick[i].type.ToString() + " is marked as " + actionsThisTick[i].state.ToString());
                 return false;
             }
         }
@@ -156,8 +205,11 @@ public class TickManager : MonoBehaviour
     void NewTick()
     {
         actionsThisTick.Clear();
+        actionsThisPhase.Clear();
+
         currentTick++;
         phase = TickPhase.Player;
+        phaseStage = PhaseStage.Initializing;
     }
 
     private void Initialize()
@@ -170,8 +222,10 @@ public class TickManager : MonoBehaviour
     {
         actionsThisTick = new List<AgentAction>();
         actionsAllTicks = new List<AgentAction>();
+        actionsThisPhase = new List<AgentAction>();
+
         player = GameObject.FindObjectOfType<AgentController>();
-        GameEvents.instance.onSuccessfulPlayerEvent += PlayerHasActed;
+        //GameEvents.instance.onSuccessfulPlayerEvent += PlayerHasActed;
         GameEvents.instance.onGenerationComplete += Initialize;
         //Uncomment when random agent generation is done
         //agents = new List<Agent>(); 
@@ -182,15 +236,26 @@ public class TickManager : MonoBehaviour
     {
         if(running)
         {
-            Tick();
-            if(ActionsReady())
-            {
-                ActionLoop();
-            }
+            if(phaseStage == PhaseStage.Initializing)
+                PhaseInit();
 
-            if(actionsThisTick.Count != 0 && CheckForActionCompletion())
+            switch(phaseStage)
             {
-                NewTick();
+                case PhaseStage.Preparing:
+                    {
+                        ActionsReady();
+                        break;
+                    }
+                case PhaseStage.Executing:
+                    {
+                        ActionLoop();
+                        break;
+                    }
+                case PhaseStage.Finished:
+                    {
+                        NextPhase();
+                        break;
+                    }
             }
             tickCounter.text = "Tick: " + currentTick;
         }

@@ -6,9 +6,9 @@ using UnityEngine;
 
 public enum AgentActionType
 {
-    Movement,
-    Attack,
-    Wait
+    Movement, //Movement actions can be executed in sync with other movement actions that share a phase
+    Attack, // Attack actions must be executed one at a time individually
+    Wait // Wait actions are executed one at a time after attacks, used for statuses like sleep/paralysis
 }
 
 public enum AgentActionState
@@ -48,7 +48,7 @@ public abstract class AgentAction
 
 public class MovementAction : AgentAction
 {
-    const float MOVE_TIME = .15f;
+    const float MOVE_TIME = .25f;
     public Vector2Int dir;
     public float moveTimeProgress = 0f;
     public MovementAction(Vector2Int dir, Agent owner)
@@ -76,7 +76,6 @@ public class MovementAction : AgentAction
     public override void ExecuteLoop()
     {
         LevelGridContainer levelGrid = LevelGridContainer.instance;
-        state = AgentActionState.Loop;
         // Lerp the sprite until it reaches its destination
         moveTimeProgress += Time.deltaTime;
         if (moveTimeProgress > MOVE_TIME) // Sets the 
@@ -190,6 +189,39 @@ public class AttackAction : AgentAction
 
     public override void FinishLoop()
     {
+        Complete();
+    }
+}
+
+public class WaitAction : AgentAction
+{
+    public WaitAction(Agent owner)
+    {
+        this.owner = owner;
+    }
+
+    public override void Prepare()
+    {
+        state = AgentActionState.Prepare;
+        state = AgentActionState.Ready;
+
+    }
+
+    public override void Execute()
+    {
+        state = AgentActionState.Execute;
+
+        state = AgentActionState.Loop;
+
+    }
+    public override void ExecuteLoop()
+    {
+        FinishLoop();
+    }
+
+    public override void FinishLoop()
+    {
+        Debug.Log(owner.name + " completed WaitAction.");
         Complete();
     }
 }

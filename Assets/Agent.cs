@@ -45,18 +45,19 @@ public class Agent : MonoBehaviour
                     if(TickManager.instance.phase == TickPhase.Player)
                     {
                         // do nothing
+                        TickManager.instance.agentController.awaitingAction = true;
                         break;
                     }
                     else
                     {
                         // AI stuff
-                        MoveAgent(Vector2Int.right, true);
+                        MoveAgent(Vector2Int.right);
                     }
                     break;
                 }
             case Team.Enemy:
                 {
-                    MoveAgent(Vector2Int.left, true);
+                    MoveAgent(Vector2Int.left);
                     break;
                 }
         }
@@ -66,7 +67,7 @@ public class Agent : MonoBehaviour
     {
 
         GridCell target = LevelGridContainer.instance.gridCells[coords.x + direction.x][coords.y + direction.y];
-        if (IsTerrainPassable(target.type) || ignoreCollision)
+        if (IsTerrainPassable(target) || ignoreCollision)
         {
             MovementAction action = new MovementAction(direction, this);
             TickManager.instance.NewAction(action);
@@ -102,6 +103,11 @@ public class Agent : MonoBehaviour
                 case Team.Ally:
                     {
                         //swap places if (this) can inhabit cell
+                        // can only be done by the player
+                        if (TickManager.instance.phase == TickPhase.Player)
+                        {
+                            
+                        }
                         return false;
                     }
                 case Team.Enemy:
@@ -113,7 +119,7 @@ public class Agent : MonoBehaviour
         }
 
 
-        return false;
+        return true;
     }
 
    
@@ -145,10 +151,15 @@ public class Agent : MonoBehaviour
         return coords; 
     }
 
+    void InitializeGridPosition()
+    {
+        LevelGridContainer.instance.gridCells[coords.x][coords.y].agentInCell = this;
+    }
+
     // Start is called before the first frame update
     void Start()
     {
-        
+        GameEvents.instance.onGenerationComplete += InitializeGridPosition;
     }
 
     // Update is called once per frame
