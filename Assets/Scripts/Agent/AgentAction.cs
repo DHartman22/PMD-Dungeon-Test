@@ -14,6 +14,7 @@ public enum AgentActionType
 public enum AgentActionState
 {
     Prepare,
+    Ready,
     Execute,
     Loop,
     Complete
@@ -34,8 +35,14 @@ public abstract class AgentAction
     // Continues execution, runs every frame until action has finished executing
     public abstract void ExecuteLoop();
 
-    // Marks this action as completed
-    public abstract void Complete(); 
+    // Performs any final bits of logic then calls Complete()
+    public abstract void FinishLoop(); 
+
+    public void Complete()
+    {
+        state = AgentActionState.Complete;
+        owner.ReportSuccess();
+    }
 
 }
 
@@ -56,7 +63,69 @@ public class MovementAction : AgentAction
         // Update the position on the grid in data
         LevelGridContainer.instance.MoveAgentToNewCell(LevelGridContainer.instance.gridCells[owner.coords.x][owner.coords.y],
             LevelGridContainer.instance.gridCells[owner.coords.x + dir.x][owner.coords.y + dir.y]);
+        state = AgentActionState.Ready;
+    }
+
+    public override void Execute()
+    {
+        state = AgentActionState.Execute;
+        // Start moving the sprite
+
+        state = AgentActionState.Loop;
+    }
+    public override void ExecuteLoop()
+    {
+        LevelGridContainer levelGrid = LevelGridContainer.instance;
+        state = AgentActionState.Loop;
+        // Lerp the sprite until it reaches its destination
+        moveTimeProgress += Time.deltaTime;
+        if (moveTimeProgress > MOVE_TIME) // Sets the 
+        {
+            
+            FinishLoop();
+            return;
+        }
+        else
+        {
+            owner.transform.position = Vector3.Lerp(levelGrid.GetCellCenterWorld(owner.coords), levelGrid.GetCellCenterWorld(owner.coords + dir), moveTimeProgress/MOVE_TIME);
+        }
         
+    }
+
+    public override void FinishLoop()
+    {
+        moveTimeProgress = MOVE_TIME;
+        owner.transform.position = LevelGridContainer.instance.GetCellCenterWorld(owner.coords + dir);
+
+        // Apply movement to owner's coords
+        owner.coords += dir;
+        Complete();
+    }
+
+}
+
+public class SwapAction : AgentAction
+{
+    const float MOVE_TIME = .15f;
+    public Vector2Int dir;
+    public float moveTimeProgress = 0f;
+    Agent victim;
+    public SwapAction(Agent owner, Agent victim)
+    {
+        this.dir = dir;
+        this.owner = owner;
+        this.victim = victim;
+    }
+
+    public override void Prepare()
+    {
+        state = AgentActionState.Prepare;
+        // Update the position on the grid in data
+        Vector2Int originalOwnerCoords = owner.coords;
+        LevelGridContainer.instance.MoveAgentToNewCell(LevelGridContainer.instance.gridCells[owner.coords.x][owner.coords.y],
+            LevelGridContainer.instance.gridCells[owner.coords.x + dir.x][owner.coords.y + dir.y]);
+        state = AgentActionState.Ready;
+
     }
 
     public override void Execute()
@@ -76,20 +145,20 @@ public class MovementAction : AgentAction
         {
             moveTimeProgress = MOVE_TIME;
             owner.transform.position = levelGrid.GetCellCenterWorld(owner.coords + dir);
-            Complete();
+            FinishLoop();
             return;
         }
         else
         {
-            owner.transform.position = Vector3.Lerp(levelGrid.GetCellCenterWorld(owner.coords), levelGrid.GetCellCenterWorld(owner.coords + dir), moveTimeProgress/MOVE_TIME);
+            owner.transform.position = Vector3.Lerp(levelGrid.GetCellCenterWorld(owner.coords), levelGrid.GetCellCenterWorld(owner.coords + dir), moveTimeProgress / MOVE_TIME);
         }
-        
+
     }
 
-    public override void Complete()
+    public override void FinishLoop()
     {
-        state = AgentActionState.Complete;
         owner.coords += dir;
+        Complete();
     }
 
 }
@@ -119,8 +188,8 @@ public class AttackAction : AgentAction
 
     }
 
-    public override void Complete()
+    public override void FinishLoop()
     {
-
+        Complete();
     }
 }

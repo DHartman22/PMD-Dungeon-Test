@@ -27,15 +27,20 @@ public class TickManager : MonoBehaviour
         }
     }
 
-    public List<Agent> agents;
+    public List<Agent> allAgents;
+    public List<Agent> allyAgents;
+    public List<AgentAction> actionsThisPhase;
     public List<AgentAction> actionsThisTick;
     public List<AgentAction> actionsAllTicks;
+    public Queue<AgentAction> actionsThisPhaseQueue;
     public TickPhase phase;
     int currentTick = 0;
+    int currentActionIndex = 0;
 
     AgentController player;
 
     [SerializeField] TextMeshProUGUI tickCounter;
+    public AgentController agentController;
     // Asks every agent what they want to do during the upcoming tick
     // Player action -> All Teammate actions -> All enemy attacks -> enemy movement -> misc
     // First, waits for player to perform an AgentAction
@@ -51,13 +56,17 @@ public class TickManager : MonoBehaviour
             case TickPhase.Player:
                 {
                     //Wait for a successful player AgentAction event
-                    GameObject.FindObjectOfType<AgentController>().awaitingAction = true;
+                    agentController.awaitingAction = true;
+                    agentController.currentAgent.RequestAction();
                     break;
                 }
             case TickPhase.Ally:
                 {
-                    NextPhase();
-                    //Wait for all allies to have a successful AgentAction event called
+                    //Wait for all allies to have an AgentAction event called
+                    foreach(Agent ally in allyAgents)
+                    {
+                        ally.RequestAction();
+                    }
                     break;
                 }
             case TickPhase.Enemy:
@@ -76,15 +85,18 @@ public class TickManager : MonoBehaviour
 
     public void NewAction(AgentAction action)
     {
+        actionsThisPhase.Add(action);
         actionsThisTick.Add(action);
+        actionsAllTicks.Add(action);
+
         action.Prepare();
     }
 
     void PlayerHasActed()
     {
+        NextPhase();
         //Prepare all teammate actions, then execute in order of movement/attack, and team ID
         //Temp loop here
-        NextPhase();
         for(int i = 0; i < actionsThisTick.Count; i++)
         {
             actionsThisTick[i].Execute();
@@ -93,7 +105,7 @@ public class TickManager : MonoBehaviour
 
     void NextPhase() //Progresses to the next phase 
     {
-        if((int)phase + 1 > (int)TickPhase.Misc)
+        if(phase == TickPhase.Misc)
         {
             Debug.Log("Waiting for completion");
             return;
@@ -101,16 +113,29 @@ public class TickManager : MonoBehaviour
         else
         {
             phase += 1;
+            actionsThisPhase.Clear();
         }
+    }
+
+    bool ActionsReady()
+    {
+        for (int i = 0; i < actionsThisPhase.Count; i++)
+        {
+            if (actionsThisPhase[i].state != AgentActionState.Ready)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     void ActionLoop()
     {
-        for(int i = 0; i < actionsThisTick.Count; i++)
+        for(int i = 0; i < actionsThisPhase.Count; i++)
         {
-            if (actionsThisTick[i].state == AgentActionState.Loop)
+            if (actionsThisPhase[i].state == AgentActionState.Loop)
             {
-                actionsThisTick[i].ExecuteLoop();
+                actionsThisPhase[i].ExecuteLoop();
             }
         }
     }
@@ -130,7 +155,6 @@ public class TickManager : MonoBehaviour
 
     void NewTick()
     {
-        actionsAllTicks.AddRange(actionsThisTick);
         actionsThisTick.Clear();
         currentTick++;
         phase = TickPhase.Player;
@@ -159,7 +183,10 @@ public class TickManager : MonoBehaviour
         if(running)
         {
             Tick();
-            ActionLoop();
+            if(ActionsReady())
+            {
+                ActionLoop();
+            }
 
             if(actionsThisTick.Count != 0 && CheckForActionCompletion())
             {

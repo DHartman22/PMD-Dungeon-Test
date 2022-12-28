@@ -11,7 +11,7 @@ public class AgentController : MonoBehaviour
     public bool yMode; // Lock player in place
     public bool rMode; // Diagonal only mode
     public Agent currentAgent; // Enventually want this to take in any agent, for now just the player
-
+    [SerializeField] bool ignoreCollision;
     public void OnMove(InputValue value)
     {
         input = new Vector2Int((int)value.Get<Vector2>().x, (int)value.Get<Vector2>().y);
@@ -45,7 +45,7 @@ public class AgentController : MonoBehaviour
             //Do not finalize input, only update facing direction
             return;
         }
-        if(currentAgent.MoveAgent(input))
+        if(currentAgent.MoveAgent(input, ignoreCollision))
         {
             awaitingAction = false;
             Debug.Log("Player move action complete");
@@ -53,9 +53,11 @@ public class AgentController : MonoBehaviour
         
     }
 
+    
+
     private void Start()
     {
-        currentAgent = GetComponent<Agent>();
+        //currentAgent = GetComponent<Agent>();
         
     }
 

@@ -13,12 +13,36 @@ public class GameEvents : MonoBehaviour
         instance = this;
     }
 
+    public event Action onActionPreparedEvent;
+
+    public void OnActionPreparedEvent()
+    {
+        if (onActionPreparedEvent != null)
+            onActionPreparedEvent();
+    }
+
     public event Action onSuccessfulPlayerEvent;
 
     public void OnSuccessfulPlayerEvent()
     {
         if (onSuccessfulPlayerEvent != null)
             onSuccessfulPlayerEvent();
+    }
+
+    public event Action onSuccessfulAllyEvent;
+
+    public void OnSuccessfulAllyEvent()
+    {
+        if (onSuccessfulAllyEvent != null)
+            onSuccessfulAllyEvent();
+    }
+
+    public event Action onSuccessfulEnemyEvent;
+
+    public void OnSuccessfulEnemyEvent()
+    {
+        if (onSuccessfulEnemyEvent != null)
+            onSuccessfulEnemyEvent();
     }
 
     public event Action onSuccessfulPogo;

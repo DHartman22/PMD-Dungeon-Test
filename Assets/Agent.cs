@@ -40,28 +40,37 @@ public class Agent : MonoBehaviour
     {
         switch(team)
         {
-            case Team.Player:
+            case Team.Ally:
                 {
-                    // 
-                    GetComponent<AgentController>().awaitingAction = true;
+                    if(TickManager.instance.phase == TickPhase.Player)
+                    {
+                        // do nothing
+                        break;
+                    }
+                    else
+                    {
+                        // AI stuff
+                        MoveAgent(Vector2Int.right, true);
+                    }
+                    break;
+                }
+            case Team.Enemy:
+                {
+                    MoveAgent(Vector2Int.left, true);
                     break;
                 }
         }
     }
 
-    public bool MoveAgent(Vector2Int direction)
+    public bool MoveAgent(Vector2Int direction, bool ignoreCollision = false)
     {
+
         GridCell target = LevelGridContainer.instance.gridCells[coords.x + direction.x][coords.y + direction.y];
-        if (IsTerrainPassable(target.type))
+        if (IsTerrainPassable(target.type) || ignoreCollision)
         {
             MovementAction action = new MovementAction(direction, this);
             TickManager.instance.NewAction(action);
-            if(team == Team.Player)
-            {
-                GameEvents.instance.OnSuccessfulPlayerEvent(); 
-            }
             return true;
-             
         }
         return false;
     }
@@ -74,8 +83,61 @@ public class Agent : MonoBehaviour
             return true;
         if (type == TerrainType.Water) //Add a type check for this later
             return true;
-        else
+
+
+
+        return false;
+    }
+
+    private bool IsTerrainPassable(GridCell targetCell)
+    {
+        if (targetCell.type == TerrainType.Solid)
             return false;
+        
+
+        if(targetCell.IsAgentInCell())
+        {
+            switch(targetCell.agentInCell.team)
+            {
+                case Team.Ally:
+                    {
+                        //swap places if (this) can inhabit cell
+                        return false;
+                    }
+                case Team.Enemy:
+                    {
+                        // Push enemy?
+                        return false;
+                    }
+            }
+        }
+
+
+        return false;
+    }
+
+   
+
+    public void ReportSuccess()
+    {
+        if(TickManager.instance.agentController.currentAgent == this)
+        {
+            GameEvents.instance.OnSuccessfulPlayerEvent();
+        }
+        switch (team)
+        {
+            case Team.Ally:
+                {
+                    GameEvents.instance.OnSuccessfulAllyEvent();
+                    break;
+                }
+            case Team.Enemy:
+                {
+                    GameEvents.instance.OnSuccessfulEnemyEvent();
+                    break;
+                }
+        }
+        return;
     }
 
     public Vector2Int GetGridPosition()

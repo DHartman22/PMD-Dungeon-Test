@@ -39,6 +39,10 @@ public class DungeonGenerator : MonoBehaviour
 
     [SerializeField] Material lineMat;
 
+    [SerializeField] bool generateOnStart;
+
+    [SerializeField] GameObject lineRendererContainer;
+
     private void Awake()
     {
         if(instance == null)
@@ -232,6 +236,7 @@ public class DungeonGenerator : MonoBehaviour
         float turnChance = baseTurnChance;
 
         GameObject lineHolder = new GameObject(currentCoords.ToString());
+        lineHolder.transform.parent = lineRendererContainer.transform;
         LineRenderer lineRenderer = lineHolder.AddComponent<LineRenderer>();
         lineRenderer.startWidth = 0.01f;
         lineRenderer.endWidth = 0.01f;
@@ -372,6 +377,7 @@ public class DungeonGenerator : MonoBehaviour
     void Start()
     {
         lineRendererObjects = new List<GameObject>();
+        if (generateOnStart) Generate();
     }
 
     // Update is called once per frame
