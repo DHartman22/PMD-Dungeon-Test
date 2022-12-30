@@ -48,7 +48,6 @@ public class LevelGridContainer : MonoBehaviour
             Agent temp = newCell.agentInCell;
             newCell.agentInCell = originalCell.agentInCell;
             originalCell.agentInCell = temp;
-            originalCell.agentInCell.status = AgentStatus.Paused;
         }
         else
         {
@@ -221,6 +220,22 @@ public class LevelGridContainer : MonoBehaviour
 
         for(int i = 0; i < gridWidth; i++)
             for(int j = 0; j < gridHeight; j++)
+            {
+                Gizmos.color = Color.white;
                 Gizmos.DrawWireCube(new Vector3((cellSize * i) + cellSize/2, (cellSize * j) + cellSize / 2) + gridStart.position, new Vector3(cellSize, cellSize));
+                if (gridCells[i][j].IsAgentInCell())
+                {
+                    
+                    if(gridCells[i][j].agentInCell.name == "AA")
+                    {
+                        Gizmos.color = Color.green;
+                    }
+                    else
+                    {
+                        Gizmos.color = Color.white;
+                    }
+                    Gizmos.DrawWireSphere(GetCellCenterWorld(new Vector2Int(i, j)), cellSize);
+                }
+            }
     }
 }

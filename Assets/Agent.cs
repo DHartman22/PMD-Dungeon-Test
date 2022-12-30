@@ -38,6 +38,11 @@ public class Agent : MonoBehaviour
     // Called when TickManager decides it's this agent's turn to move
     public void RequestAction()
     {
+        if(status == AgentStatus.Paused)
+        {
+            status = AgentStatus.Normal;
+            return;
+        }
         switch(team)
         {
             case Team.Ally:
@@ -63,15 +68,47 @@ public class Agent : MonoBehaviour
         }
     }
 
+    public void ApplyStatus(AgentStatus newStatus)
+    {
+        // Add log
+        status = newStatus;
+    }
+
     public bool MoveAgent(Vector2Int direction, bool ignoreCollision = false)
     {
 
         GridCell target = LevelGridContainer.instance.gridCells[coords.x + direction.x][coords.y + direction.y];
-        if (IsTerrainPassable(target) || ignoreCollision)
+        if (IsTerrainPassable(target.type) || ignoreCollision)
         {
-            MovementAction action = new MovementAction(direction, this);
-            TickManager.instance.NewAction(action);
-            return true;
+            if (target.IsAgentInCell())
+            {
+                if (TickManager.instance.phase == TickPhase.Player)
+                {
+                    switch (target.agentInCell.team)
+                    {
+                        case Team.Ally:
+                            {
+                                //swap places if (this) can inhabit cell
+                                // can only be done by the player
+                                SwapAction action = new SwapAction(this, target.agentInCell);
+                                TickManager.instance.NewAction(action);
+
+                                return true;
+                            }
+                        case Team.Enemy:
+                            {
+                                // Push enemy?
+                                return false;
+                            }
+                    }
+                }
+            }
+            else
+            {
+                MovementAction action = new MovementAction(direction, this);
+                TickManager.instance.NewAction(action);
+                return true;
+            }
         }
         return false;
     }
@@ -80,14 +117,14 @@ public class Agent : MonoBehaviour
     {
         if(type == TerrainType.Solid)
             return false;
-        if (type == TerrainType.Ground)
-            return true;
-        if (type == TerrainType.Water) //Add a type check for this later
-            return true;
+        //if (type == TerrainType.Ground)
+        //    return true;
+        //if (type == TerrainType.Water) //Add a type check for this later
+        //    return true;
 
 
 
-        return false;
+        return true;
     }
 
     private bool IsTerrainPassable(GridCell targetCell)
@@ -98,23 +135,22 @@ public class Agent : MonoBehaviour
 
         if(targetCell.IsAgentInCell())
         {
-            switch(targetCell.agentInCell.team)
+            if (TickManager.instance.phase == TickPhase.Player)
             {
-                case Team.Ally:
-                    {
-                        //swap places if (this) can inhabit cell
-                        // can only be done by the player
-                        if (TickManager.instance.phase == TickPhase.Player)
+                switch(targetCell.agentInCell.team)
+                {
+                    case Team.Ally:
                         {
-                            
+                            //swap places if (this) can inhabit cell
+                            // can only be done by the player
+                            return false;
                         }
-                        return false;
-                    }
-                case Team.Enemy:
-                    {
-                        // Push enemy?
-                        return false;
-                    }
+                    case Team.Enemy:
+                        {
+                            // Push enemy?
+                            return false;
+                        }
+                }   
             }
         }
 
@@ -122,6 +158,7 @@ public class Agent : MonoBehaviour
         return true;
     }
 
+    
    
 
     public void ReportSuccess()

@@ -26,6 +26,7 @@ public abstract class AgentAction
     public Agent owner;
     public AgentActionState state;
 
+    
     // Locks in the action, e.g. updating grid information for where the agent will move
     public abstract void Prepare();
 
@@ -55,6 +56,7 @@ public class MovementAction : AgentAction
     {
         this.dir = dir;
         this.owner = owner;
+        type = AgentActionType.Movement;
     }
 
     public override void Prepare()
@@ -114,15 +116,15 @@ public class SwapAction : AgentAction
         this.dir = dir;
         this.owner = owner;
         this.victim = victim;
+        type = AgentActionType.Movement;
     }
 
     public override void Prepare()
     {
         state = AgentActionState.Prepare;
         // Update the position on the grid in data
-        Vector2Int originalOwnerCoords = owner.coords;
         LevelGridContainer.instance.MoveAgentToNewCell(LevelGridContainer.instance.gridCells[owner.coords.x][owner.coords.y],
-            LevelGridContainer.instance.gridCells[owner.coords.x + dir.x][owner.coords.y + dir.y]);
+            LevelGridContainer.instance.gridCells[victim.coords.x][victim.coords.y]);
         state = AgentActionState.Ready;
 
     }
@@ -140,23 +142,30 @@ public class SwapAction : AgentAction
         state = AgentActionState.Loop;
         // Lerp the sprite until it reaches its destination
         moveTimeProgress += Time.deltaTime;
-        if (moveTimeProgress > MOVE_TIME) // Sets the 
+        if (moveTimeProgress > MOVE_TIME) // Sets the world transform
         {
             moveTimeProgress = MOVE_TIME;
-            owner.transform.position = levelGrid.GetCellCenterWorld(owner.coords + dir);
+            owner.transform.position = levelGrid.GetCellCenterWorld(victim.coords);
+            victim.transform.position = levelGrid.GetCellCenterWorld(owner.coords);
+
             FinishLoop();
             return;
         }
         else
         {
-            owner.transform.position = Vector3.Lerp(levelGrid.GetCellCenterWorld(owner.coords), levelGrid.GetCellCenterWorld(owner.coords + dir), moveTimeProgress / MOVE_TIME);
+            owner.transform.position = Vector3.Lerp(levelGrid.GetCellCenterWorld(owner.coords), levelGrid.GetCellCenterWorld(victim.coords), moveTimeProgress / MOVE_TIME);
+            victim.transform.position = Vector3.Lerp(levelGrid.GetCellCenterWorld(victim.coords), levelGrid.GetCellCenterWorld(owner.coords), moveTimeProgress / MOVE_TIME);
+
         }
 
     }
 
     public override void FinishLoop()
     {
-        owner.coords += dir;
+        Vector2Int originalOwnerCoords = owner.coords;
+        owner.coords = victim.coords;
+        victim.coords = originalOwnerCoords;
+        victim.ApplyStatus(AgentStatus.Paused);
         Complete();
     }
 
@@ -171,6 +180,7 @@ public class AttackAction : AgentAction
     {
         this.dir = dir;
         this.owner = owner;
+        type = AgentActionType.Attack;
     }
 
     public override void Prepare()
@@ -198,6 +208,7 @@ public class WaitAction : AgentAction
     public WaitAction(Agent owner)
     {
         this.owner = owner;
+        type = AgentActionType.Wait;
     }
 
     public override void Prepare()
